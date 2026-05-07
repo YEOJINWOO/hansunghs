@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>동전 거스름돈 트리 시각화</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: 'Noto Sans KR', sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* Version selector tabs */
+.ver-tabs { display: flex; gap: 0; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; }
+.ver-tab {
+  padding: 0.32rem 0.9rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  cursor: pointer;
+  background: #0d1117;
+  color: #7d8590;
+  border: none;
+  transition: all 0.15s;
+}
+.ver-tab:hover { color: #e6edf3; }
+.ver-tab.active { background: #58a6ff; color: #0d1117; font-weight: 600; }
+
+.topbar label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: #7d8590;
+}
+.topbar input[type=number] {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  color: #e6edf3;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  padding: 0.32rem 0.6rem;
+  width: 90px;
+  outline: none;
+}
+.topbar input:focus { border-color: #58a6ff; }
+
+.btn {
+  background: #58a6ff;
+  color: #0d1117;
+  border: none;
+  border-radius: 5px;
+  padding: 0.36rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover { opacity: 0.85; }
+.btn.ghost {
+  background: #21262d;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+}
+.btn.ghost:hover { border-color: #58a6ff; color: #58a6ff; }
+
+.speed-wrap {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem; color: #7d8590;
+}
+.speed-wrap input[type=range] { accent-color: #58a6ff; width: 75px; }
+
+.stats {
+  display: flex; gap: 1rem; margin-left: auto;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+}
+.stat { display: flex; flex-direction: column; align-items: flex-end; }
+.stat-l { color: #7d8590; font-size: 0.62rem; }
+.stat-v { color: #58a6ff; font-weight: 600; font-size: 0.88rem; }
+.stat-v.green { color: #3fb950; }
+
+/* Version info bar */
+.infobar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.35rem 1.25rem;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.ver-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.ver-badge.v1 { background: #1a2d4a; color: #58a6ff; border: 1px solid #1f4080; }
+.ver-badge.v2 { background: #2d1f4a; color: #bc8cff; border: 1px solid #4a3080; }
+
+.pruning-info {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: #7d8590;
+}
+.pruning-info span { color: #e6edf3; }
+
+.legend {
+  display: flex; gap: 0.9rem; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #7d8590;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+.canvas-wrap {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+canvas { display: block; }
+
+.tooltip {
+  position: fixed;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: #e6edf3;
+  pointer-events: none;
+  display: none;
+  z-index: 100;
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="ver-tabs">
+    <button class="ver-tab" id="tab2" onclick="selectVer(2)">버전 1 (가지치기 1개)</button>
+    <button class="ver-tab active" id="tab1" onclick="selectVer(1)">버전 2 (가지치기 2개)</button>
+  </div>
+
+  <label>n =</label>
+  <input type="number" id="nInput" value="730" min="10" max="9990" step="10">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <button class="btn" onclick="startViz()">▶ 실행</button>
+  <button class="btn ghost" onclick="stopViz()">■ 정지</button>
+  <button class="btn ghost" onclick="resetViz()">↺ 초기화</button>
+
+  <div class="speed-wrap">
+    속도 <input type="range" id="spd" min="1" max="5" value="3">
+    <span id="spdLabel">보통</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span class="stat-l">won</span><span class="stat-v" id="sv-won">-</span></div>
+    <div class="stat"><span class="stat-l">d</span><span class="stat-v" id="sv-d">-</span></div>
+    <div class="stat"><span class="stat-l">ans</span><span class="stat-v green" id="sv-ans">-</span></div>
+    <div class="stat"><span class="stat-l">노드</span><span class="stat-v" id="sv-nodes">0</span></div>
+  </div>
+</div>
+
+<div class="infobar">
+  <div class="ver-badge v1" id="verBadge">버전 1</div>
+  <div class="pruning-info" id="pruningInfo">
+    가지치기: <span>① won &gt; n</span> &nbsp;|&nbsp; <span>② d ≥ ans</span>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="leg-dot" style="background:#58a6ff"></div>탐색 중</div>
+    <div class="legend-item"><div class="leg-dot" style="background:#3fb950"></div>정답 (won=n)</div>
+    <div class="legend-item"><div class="leg-dot" style="background:#ff7b72"></div>가지치기 (won&gt;n)</div>
+    <div class="legend-item" id="leg-ans"><div class="leg-dot" style="background:#d29922"></div>가지치기 (d≥ans)</div>
+    <div class="legend-item"><div class="leg-dot" style="background:#2d333b"></div>완료</div>
+  </div>
+</div>
+
+<div class="canvas-wrap" id="canvasWrap">
+  <canvas id="cvs"></canvas>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const COINS = [500, 100, 50, 10];
+const COIN_COLORS = ['#bc8cff', '#58a6ff', '#39d353', '#ffa657'];
+const SPD_MS = { 1: 300, 2: 100, 3: 30, 4: 8, 5: 1 };
+const SPD_LABELS = { 1: '느림', 2: '조금 느림', 3: '보통', 4: '빠름', 5: '매우 빠름' };
+const NODE_R = 18;
+const V_GAP = 72;
+const MAX_NODES = 900;
+
+let currentVer = 1;
+let nodes = [], edges = [], steps = [];
+let stepIdx = 0, timer = null;
+
+const cvs = document.getElementById('cvs');
+const ctx = cvs.getContext('2d');
+let canvasW = 800, canvasH = 500;
+
+function selectVer(v) {
+  currentVer = v;
+  document.getElementById('tab1').classList.toggle('active', v === 1);
+  document.getElementById('tab2').classList.toggle('active', v === 2);
+
+  const badge = document.getElementById('verBadge');
+  const info = document.getElementById('pruningInfo');
+  const legAns = document.getElementById('leg-ans');
+
+  if (v === 1) {
+    badge.className = 'ver-badge v1';
+    badge.textContent = '버전 1';
+    info.innerHTML = '가지치기: <span>① won &gt; n</span> &nbsp;|&nbsp; <span>② d ≥ ans</span>';
+    legAns.style.display = 'flex';
+  } else {
+    badge.className = 'ver-badge v2';
+    badge.textContent = '버전 2';
+    info.innerHTML = '가지치기: <span>① won &gt; n</span> &nbsp;&nbsp; <span style="color:#7d8590">② d ≥ ans 없음</span>';
+    legAns.style.display = 'none';
+  }
+  resetViz();
+}
+
+document.getElementById('spd').addEventListener('input', function() {
+  document.getElementById('spdLabel').textContent = SPD_LABELS[this.value];
+});
+
+function buildTreeV1(n) {
+  nodes = []; edges = []; steps = [];
+  let ans = 987654321;
+  let nc = 0;
+
+  function addNode(won, d, parentId, coinIdx, depth) {
+    const id = nc++;
+    nodes.push({ id, won, d, x: 0, y: 0, px: 0, py: 0, state: 'pending', parentId, coinIdx, depth });
+    if (parentId !== null) edges.push({ from: parentId, to: id, coin: coinIdx });
+    return id;
+  }
+
+  function dfs(won, d, parentId, coinIdx, depth) {
+    if (nodes.length >= MAX_NODES) return;
+    const id = addNode(won, d, parentId, coinIdx, depth);
+    steps.push({ type: 'visit', id, won, d, ans });
+
+    if (won > n) {
+      steps.push({ type: 'prune_over', id, won, d, ans });
+      return;
+    }
+    if (d >= ans) {
+      steps.push({ type: 'prune_ans', id, won, d, ans });
+      return;
+    }
+    if (won === n) {
+      ans = Math.min(d, ans);
+      steps.push({ type: 'found', id, won, d, ans });
+      return;
+    }
+    steps.push({ type: 'expand', id, won, d, ans });
+    for (let i = 0; i < 4; i++) {
+      if (nodes.length >= MAX_NODES) break;
+      dfs(won + COINS[i], d + 1, id, i, depth + 1);
+    }
+  }
+
+  dfs(0, 0, null, null, 0);
+}
+
+function buildTreeV2(n) {
+  nodes = []; edges = []; steps = [];
+  let ans = 987654321;
+  let nc = 0;
+
+  function addNode(won, d, parentId, coinIdx, depth) {
+    const id = nc++;
+    nodes.push({ id, won, d, x: 0, y: 0, px: 0, py: 0, state: 'pending', parentId, coinIdx, depth });
+    if (parentId !== null) edges.push({ from: parentId, to: id, coin: coinIdx });
+    return id;
+  }
+
+  function dfs(won, d, parentId, coinIdx, depth) {
+    if (nodes.length >= MAX_NODES) return;
+    const id = addNode(won, d, parentId, coinIdx, depth);
+    steps.push({ type: 'visit', id, won, d, ans });
+
+    if (won > n) {
+      steps.push({ type: 'prune_over', id, won, d, ans });
+      return;
+    }
+    if (won === n) {
+      ans = Math.min(d, ans);
+      steps.push({ type: 'found', id, won, d, ans });
+      return;
+    }
+    steps.push({ type: 'expand', id, won, d, ans });
+    for (let i = 0; i < 4; i++) {
+      if (nodes.length >= MAX_NODES) break;
+      dfs(won + COINS[i], d + 1, id, i, depth + 1);
+    }
+  }
+
+  dfs(0, 0, null, null, 0);
+}
+
+function layoutTree() {
+  const children = {};
+  nodes.forEach(nd => { children[nd.id] = []; });
+  nodes.forEach(nd => { if (nd.parentId !== null) children[nd.parentId].push(nd.id); });
+
+  const subW = {};
+  function computeW(id) {
+    const ch = children[id];
+    if (!ch || ch.length === 0) { subW[id] = 1; return; }
+    ch.forEach(c => computeW(c));
+    subW[id] = ch.reduce((s, c) => s + subW[c], 0);
+  }
+  if (nodes.length > 0) computeW(0);
+
+  function assignX(id, left) {
+    const ch = children[id];
+    nodes[id].x = left + subW[id] / 2;
+    let cur = left;
+    (ch || []).forEach(c => { assignX(c, cur); cur += subW[c]; });
+  }
+  if (nodes.length > 0) assignX(0, 0);
+
+  nodes.forEach(nd => { nd.y = nd.depth; });
+
+  const maxX = Math.max(...nodes.map(n => n.x), 1);
+  const maxY = Math.max(...nodes.map(n => n.y), 1);
+  const cellW = NODE_R * 2 + 32;
+  const W = Math.max(Math.round((maxX + 1) * cellW), 800);
+  const H = Math.max(Math.round((maxY + 1) * V_GAP + 60), 400);
+  canvasW = W; canvasH = H;
+  cvs.width = W; cvs.height = H;
+
+  nodes.forEach(nd => {
+    nd.px = Math.round((nd.x / (maxX + 1)) * W + (W / (maxX + 1)) / 2);
+    nd.py = Math.round(nd.y * V_GAP + 40);
+  });
+}
+
+function getNodeColor(nd) {
+  switch (nd.state) {
+    case 'visiting':   return '#1a3a5c';
+    case 'found':      return '#1a3d28';
+    case 'prune_over': return '#3d1a1a';
+    case 'prune_ans':  return '#3d2e0a';
+    case 'done':       return '#1e2329';
+    default:           return '#161b22';
+  }
+}
+function getBorderColor(nd) {
+  switch (nd.state) {
+    case 'visiting':   return '#58a6ff';
+    case 'found':      return '#3fb950';
+    case 'prune_over': return '#ff7b72';
+    case 'prune_ans':  return '#d29922';
+    case 'done':       return '#2d333b';
+    default:           return '#30363d';
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvasW, canvasH);
+
+  // edges
+  edges.forEach(e => {
+    const f = nodes[e.from], t = nodes[e.to];
+    if (!f || !t) return;
+    ctx.beginPath();
+    ctx.moveTo(f.px, f.py);
+    ctx.lineTo(t.px, t.py);
+    ctx.strokeStyle = e.coin !== null ? COIN_COLORS[e.coin] + '66' : '#30363d';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // coin label
+    if (e.coin !== null) {
+      const mx = (f.px + t.px) / 2 + 6;
+      const my = (f.py + t.py) / 2;
+      ctx.font = '500 8px JetBrains Mono, monospace';
+      ctx.fillStyle = COIN_COLORS[e.coin] + 'bb';
+      ctx.textAlign = 'center';
+      ctx.fillText('+' + COINS[e.coin], mx, my);
+    }
+  });
+
+  // nodes
+  nodes.forEach(nd => {
+    if (!nd.px) return;
+    ctx.beginPath();
+    ctx.arc(nd.px, nd.py, NODE_R, 0, Math.PI * 2);
+    ctx.fillStyle = getNodeColor(nd);
+    ctx.fill();
+    ctx.strokeStyle = getBorderColor(nd);
+    ctx.lineWidth = nd.state === 'visiting' ? 2.5 : 1.5;
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '600 10px JetBrains Mono, monospace';
+    ctx.fillStyle = nd.state === 'pending' ? '#444c56' : '#e6edf3';
+    ctx.fillText(nd.won, nd.px, nd.py - 3);
+
+    ctx.font = '400 8px JetBrains Mono, monospace';
+    ctx.fillStyle = nd.state === 'pending' ? '#30363d' : '#8b949e';
+    ctx.fillText('d=' + nd.d, nd.px, nd.py + 7);
+  });
+}
+
+function applyStep(s) {
+  const nd = nodes[s.id];
+  if (!nd) return;
+  switch (s.type) {
+    case 'visit':
+      nd.state = 'visiting';
+      document.getElementById('sv-won').textContent = s.won;
+      document.getElementById('sv-d').textContent = s.d;
+      document.getElementById('sv-ans').textContent = s.ans >= 987654321 ? '∞' : s.ans;
+      document.getElementById('sv-nodes').textContent = nodes.filter(n => n.state !== 'pending').length;
+      break;
+    case 'prune_over': nd.state = 'prune_over'; break;
+    case 'prune_ans':  nd.state = 'prune_ans'; break;
+    case 'found':
+      nd.state = 'found';
+      document.getElementById('sv-ans').textContent = s.ans;
+      break;
+    case 'expand': nd.state = 'done'; break;
+  }
+  draw();
+}
+
+function tick() {
+  if (stepIdx >= steps.length) { draw(); return; }
+  applyStep(steps[stepIdx++]);
+  timer = setTimeout(tick, SPD_MS[document.getElementById('spd').value]);
+}
+
+function startViz() {
+  resetViz();
+  const n = parseInt(document.getElementById('nInput').value);
+  if (!n || n < 10 || n % 10 !== 0) { alert('10의 배수 양수를 입력하세요'); return; }
+
+  if (currentVer === 1) buildTreeV1(n);
+  else buildTreeV2(n);
+
+  layoutTree();
+  draw();
+  stepIdx = 0;
+  tick();
+}
+
+function stopViz() { clearTimeout(timer); }
+
+function resetViz() {
+  clearTimeout(timer);
+  nodes = []; edges = []; steps = []; stepIdx = 0;
+  canvasW = 800; canvasH = 500;
+  cvs.width = 800; cvs.height = 500;
+  ctx.clearRect(0, 0, 800, 500);
+  ctx.fillStyle = '#7d8590';
+  ctx.font = '14px Noto Sans KR, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('n 값을 입력하고 실행하세요', 400, 250);
+  ['sv-won','sv-d','sv-ans','sv-nodes'].forEach(id => {
+    document.getElementById(id).textContent = id === 'sv-nodes' ? '0' : '-';
+  });
+}
+
+// Tooltip
+const tip = document.getElementById('tooltip');
+const stateMap = { visiting:'탐색 중', found:'정답', prune_over:'가지치기(초과)', prune_ans:'가지치기(ans)', done:'완료', pending:'대기' };
+
+cvs.addEventListener('mousemove', e => {
+  const rect = cvs.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let found = null;
+  for (const nd of nodes) {
+    const dx = nd.px - mx, dy = nd.py - my;
+    if (Math.sqrt(dx*dx + dy*dy) < NODE_R) { found = nd; break; }
+  }
+  if (found) {
+    tip.style.display = 'block';
+    tip.style.left = (e.clientX + 14) + 'px';
+    tip.style.top = (e.clientY - 10) + 'px';
+    const coinLabel = found.coinIdx !== null ? '+' + COINS[found.coinIdx] : '시작';
+    tip.innerHTML = `won = ${found.won} &nbsp; d = ${found.d}<br>선택 동전: ${coinLabel}<br>상태: ${stateMap[found.state] || found.state}`;
+  } else {
+    tip.style.display = 'none';
+  }
+});
+cvs.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+
+// Init
+resetViz();
+</script>
+</body>
+</html>
