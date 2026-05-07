@@ -159,8 +159,8 @@ canvas { display: block; }
 
 <div class="topbar">
   <div class="ver-tabs">
-    <button class="ver-tab active" id="tab1" onclick="selectVer(2)">버전 2 (가지치기 2개)</button>
-    <button class="ver-tab " id="tab2" onclick="selectVer(1)">버전 1 (가지치기 1개)</button>
+    <button class="ver-tab active" id="tab2" onclick="selectVer(2)">버전 1 (가지치기 1개)</button>
+    <button class="ver-tab" id="tab1" onclick="selectVer(1)">버전 2 (가지치기 2개)</button>
   </div>
 
   <label>n =</label>
@@ -229,14 +229,14 @@ function selectVer(v) {
   const legAns = document.getElementById('leg-ans');
 
   if (v === 1) {
-    badge.className = 'ver-badge v1';
+    badge.className = 'ver-badge v2';
     badge.textContent = '버전 2';
-    info.innerHTML = '가지치기: <span>① won &gt; n</span> &nbsp;&nbsp; <span style="color:#7d8590">② d ≥ ans 없음</span>';
+    info.innerHTML = '가지치기: <span>① won &gt; n</span> &nbsp;|&nbsp; <span>② d ≥ ans</span>';
     legAns.style.display = 'flex';
   } else {
-    badge.className = 'ver-badge v2';
+    badge.className = 'ver-badge v1';
     badge.textContent = '버전 1';
-    info.innerHTML = '가지치기: <span>① won &gt; n</span> &nbsp;|&nbsp; <span>② d ≥ ans</span>';
+    info.innerHTML = '가지치기: <span>① won &gt; n</span> &nbsp;&nbsp; <span style="color:#7d8590">② d ≥ ans 없음</span>';
     legAns.style.display = 'none';
   }
   resetViz();
